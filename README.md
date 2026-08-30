@@ -7,7 +7,7 @@ A sophisticated voice-enabled conversational AI assistant built with RASA, desig
 ### Core Capabilities
 - **Voice Interface**: Real-time speech recognition and text-to-speech conversion
 - **Conversational AI**: Powered by RASA framework with advanced NLU processing
-- **LLM Integration**: Enhanced responses using Groq LLM for natural conversations
+- **LLM Integration**: Enhanced responses using the Claude (Anthropic) API for natural conversations
 - **BYD Sealion 7 Expertise**: Specialized knowledge about the BYD Sealion 7 vehicle
 - **Multi-modal Communication**: Supports both text and voice interactions
 
@@ -24,7 +24,7 @@ A sophisticated voice-enabled conversational AI assistant built with RASA, desig
 RASA Voice Assistant
 ├── RASA Core (Conversation Management)
 ├── NLU Pipeline (Intent Recognition)
-├── LLM Service (Groq Integration)
+├── LLM Service (Claude API Integration)
 ├── Voice Interface (Speech I/O)
 └── Custom Actions (Business Logic)
 ```
@@ -38,7 +38,7 @@ RASA Voice Assistant
 
 ### API Keys Required
 - **ElevenLabs API Key**: For high-quality text-to-speech
-- **Groq API Key**: For LLM-powered responses
+- **Anthropic API Key**: For LLM-powered responses (get one at https://console.anthropic.com)
 
 ## 🛠️ Installation
 
@@ -63,7 +63,9 @@ RASA Voice Assistant
    Create a `.env` file in the project root:
    ```env
    ELEVEN_LABS_API2=your_elevenlabs_api_key_here
-   GROQ_API_KEY=your_groq_api_key_here
+   ANTHROPIC_API_KEY=your_anthropic_api_key_here
+   # Optional - defaults to claude-opus-5
+   # ANTHROPIC_MODEL=claude-opus-5
    ```
 
 ## 🚀 Quick Start
@@ -136,9 +138,11 @@ RASA_Voice_Assistant/
 - **Audio Quality**: High-quality ElevenLabs synthesis
 
 ### LLM Configuration
-- **Model**: Groq Llama-3.1-8b-instant
-- **Temperature**: 0.5 for balanced creativity
-- **Max Tokens**: 250 for concise responses
+- **Provider**: Claude API (Anthropic Python SDK)
+- **Model**: `claude-opus-5` (override with `ANTHROPIC_MODEL`; `claude-haiku-4-5` is a cheaper, lower-latency option for live calls)
+- **Effort**: `low` - these are short conversational turns, so shallow thinking keeps latency down
+- **Max Tokens**: 2048 - the reply is capped at 40 words by the prompt, but adaptive thinking draws from the same budget
+- **Prompt caching**: the Rachel persona is sent as a cached system block, so repeat turns in a call are billed at ~0.1x for that prefix
 
 ## 🧪 Testing
 
@@ -177,7 +181,7 @@ python voice_interface.py
    - Check logs for specific error messages
 
 4. **LLM Service Errors**
-   - Verify Groq API key
+   - Verify Anthropic API key
    - Check internet connection
    - Ensure API quota is not exceeded
 
@@ -219,7 +223,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 - **RASA**: Open-source conversational AI framework
 - **ElevenLabs**: High-quality text-to-speech API
-- **Groq**: Fast LLM inference service
+- **Anthropic**: Claude API for LLM responses
 - **Google Speech Recognition**: Speech-to-text capabilities
 
 ## 📞 Support
