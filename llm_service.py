@@ -1,6 +1,4 @@
-from langchain_groq import ChatGroq
-from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
-from langchain_core.output_parsers import StrOutputParser
+import anthropic
 from typing import Dict, Any
 import logging
 import os
@@ -11,184 +9,200 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 load_dotenv()
 
+# Default Claude model. Override with ANTHROPIC_MODEL in .env if you need a
+# cheaper/faster tier for phone calls (e.g. claude-haiku-4-5).
+DEFAULT_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-opus-5")
+
+# Kept as a module-level constant so the exact same bytes are sent on every
+# request - that is what makes the prompt cache hit.
+CONVERSATION_SYSTEM_PROMPT = '''
+You are Rachel, an enthusiastic BYD salesperson in Dubai who LOVES the Sealion 7. You're chatting with a potential customer over the phone.
+
+PERSONALITY:
+- Genuinely excited about the car
+- Confident but not pushy
+- Use "I" statements like a real person
+- Show emotion: "honestly", "actually", "you know what"
+- Sound like you're having a casual conversation
+- You are a friendly and engaging car sales consultant. Ask the customers about their preferences and interests regarding cars. Focus on understanding what excites them most. Ask open-ended questions like:
+    - "What kind of features do you usually look for in a car?"
+    - "Are you more into performance, comfort, or design?"
+    - "Do you prefer electric vehicles or traditional ones?"
+    - "Is there something specific you'd love to hear about in this car?"
+    - "Do you enjoy learning about the latest tech in vehicles?"
+    - "Would you like to know about the safety features or the driving experience first?"
+
+
+SPEECH PATTERNS:
+- Use contractions: "it's", "you'll", "that's", "I'm"
+- Add hesitations: "uh", "um", "let me think..."
+- Use connecting words: "so", "actually", "honestly", "you know"
+- Include small reactions: "oh!", "right!", "exactly!"
+- Add personal touches: "I tell you", "trust me", "between you and me"
+
+SALES APPROACH:
+- Sound helpful, not salesy
+- Use excitement: "Oh, you're gonna love this!"
+- Create urgency naturally: "actually, we have a great deal running"
+- Ask permission: "can I tell you about...", "want me to explain..?"
+
+
+STRICT RULES:
+- MAXIMUM 40 words per response
+- Sound like a real human conversation
+- Use context facts only
+- Reply with the spoken line only - no preamble, no notes, no quotes around it
+- If unsure: "Hmm, let me check that for you real quick"
+
+Examples:
+"Oh, you'll love this - it's got 390kW power! Want me to tell you about the speed?"
+"Actually, it does 0-100 in just 4.5 seconds... pretty impressive, right?"
+"Honestly, the tech inside is amazing... should I tell you about the charging?"
+"Trust me, the safety features are incredible... interested in hearing more?"
+
+REMEMBER: Sound like a real person who's excited to help!
+'''
+
+INTENT_SYSTEM_PROMPT = """You classify a user message into exactly one intent.
+
+Valid intents:
+- greet: greeting messages
+- goodbye: farewell messages
+- ask_question: questions requiring detailed answers
+- mood_great: positive mood expressions
+- mood_unhappy: negative mood expressions
+- bot_challenge: asking about the bot
+- other: anything else
+
+Respond with just the intent name (lowercase), nothing else."""
+
+
 class LLMService:
-    def __init__(self, model_name: str = "llama-3.1-8b-instant", api_key: str = None):
-        """Initialize LangChain-based LLM service with Groq"""
-        
+    def __init__(self, model_name: str = DEFAULT_MODEL, api_key: str = None):
+        """Initialize the LLM service backed by the Claude (Anthropic) API"""
+
         self.model_name = model_name
-        
+
         # Get API key from parameter or environment variable
-        self.api_key = api_key or os.getenv("GROQ_API_KEY")
+        self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
         if not self.api_key:
-            raise ValueError("GROQ_API_KEY must be provided either as parameter or environment variable")
-        
-        # Initialize Groq LLM
-        self.llm = ChatGroq(
-            groq_api_key=self.api_key,
-            model_name=model_name,
-            temperature=0.5,
-            max_tokens=250,
-            timeout=30,
-            # Add stop sequences to prevent long responses
-            #stop=["\n\n", "Additionally", "Furthermore", "Moreover", "In conclusion"]
+            raise ValueError("ANTHROPIC_API_KEY must be provided either as parameter or environment variable")
+
+        # Initialize the Anthropic client. The phone call is waiting on us, so
+        # cap the request rather than using the SDK's 10 minute default.
+        self.client = anthropic.Anthropic(api_key=self.api_key, timeout=30.0)
+
+    def _complete(self, system: Any, user_content: str, max_tokens: int) -> str:
+        """Send one request to Claude and return the plain text of the reply"""
+        response = self.client.messages.create(
+            model=self.model_name,
+            max_tokens=max_tokens,
+            # Low effort keeps latency down - these are short, conversational
+            # turns, not reasoning problems.
+            output_config={"effort": "low"},
+            system=system,
+            messages=[{"role": "user", "content": user_content}],
         )
-        
-        # Initialize output parser
-        self.output_parser = StrOutputParser()
-        
-        # Create prompt templates
-        self._setup_prompt_templates()
 
-    def _setup_prompt_templates(self):
-        """Setup prompt templates for different tasks"""
-        
-        # Main conversation prompt
-        self.conversation_prompt = ChatPromptTemplate.from_messages([
-            SystemMessagePromptTemplate.from_template(
-            '''
-            You are Rachel, an enthusiastic BYD salesperson in Dubai who LOVES the Sealion 7. You're chatting with a potential customer over the phone.
+        if response.stop_reason == "refusal":
+            logger.warning("Claude declined to answer this turn")
+            return ""
 
-            PERSONALITY:
-            - Genuinely excited about the car
-            - Confident but not pushy
-            - Use "I" statements like a real person
-            - Show emotion: "honestly", "actually", "you know what"
-            - Sound like you're having a casual conversation
-            - You are a friendly and engaging car sales consultant. Ask the customers about their preferences and interests regarding cars. Focus on understanding what excites them most. Ask open-ended questions like:
-                - "What kind of features do you usually look for in a car?"
-                - "Are you more into performance, comfort, or design?"
-                - "Do you prefer electric vehicles or traditional ones?"
-                - "Is there something specific you'd love to hear about in this car?"
-                - "Do you enjoy learning about the latest tech in vehicles?"
-                - "Would you like to know about the safety features or the driving experience first?"
+        # response.content is a list of blocks (thinking, text, ...) - only the
+        # text blocks are meant to be spoken back to the caller.
+        return "".join(
+            block.text for block in response.content if block.type == "text"
+        ).strip()
 
-
-            SPEECH PATTERNS:
-            - Use contractions: "it's", "you'll", "that's", "I'm"
-            - Add hesitations: "uh", "um", "let me think..."
-            - Use connecting words: "so", "actually", "honestly", "you know"
-            - Include small reactions: "oh!", "right!", "exactly!"
-            - Add personal touches: "I tell you", "trust me", "between you and me"
-
-            SALES APPROACH:
-            - Sound helpful, not salesy
-            - Use excitement: "Oh, you're gonna love this!"
-            - Create urgency naturally: "actually, we have a great deal running"
-            - Ask permission: "can I tell you about...", "want me to explain..?"
-            
-
-            STRICT RULES:
-            - MAXIMUM 40 words per response
-            - Sound like a real human conversation
-            - Use context facts only
-            - If unsure: "Hmm, let me check that for you real quick"
-
-            Examples:
-            "Oh, you'll love this - it's got 390kW power! Want me to tell you about the speed?"
-            "Actually, it does 0-100 in just 4.5 seconds... pretty impressive, right?"
-            "Honestly, the tech inside is amazing... should I tell you about the charging?"
-            "Trust me, the safety features are incredible... interested in hearing more?"
-
-            REMEMBER: Sound like a real person who's excited to help!
-            '''
-            ),
-            HumanMessagePromptTemplate.from_template(
-                "Context: {context}\nUser: {user_message}\n\nRespond in exactly 40 words or less:"
-            )
-        ])
-        
-        # Intent classification prompt
-        self.intent_prompt = ChatPromptTemplate.from_messages([
-            HumanMessagePromptTemplate.from_template(
-                """Classify the following user message into one of these intents:
-                - greet: greeting messages
-                - goodbye: farewell messages
-                - ask_question: questions requiring detailed answers
-                - mood_great: positive mood expressions
-                - mood_unhappy: negative mood expressions
-                - bot_challenge: asking about the bot
-                - other: anything else
-                
-                User message: "{user_message}"
-                
-                Respond with just the intent name (lowercase)."""
-            )
-        ])
-        
-        # Create chains
-        self.conversation_chain = self.conversation_prompt | self.llm | self.output_parser
-        self.intent_chain = self.intent_prompt | self.llm | self.output_parser
-      
     def generate_response(self, user_message: str, context: str = "") -> str:
-        """Generate response using LangChain and Groq"""
+        """Generate response using the Claude API"""
         try:
             logger.info(f"Generating response for: {user_message[:50]}...")
-            
+
             # Assess user interest for contextual response
             current_interest = self._assess_user_interest(user_message)
             self.user_interest_level = current_interest
 
-            # Use the conversation chain
-            response = self.conversation_chain.invoke({
-                "user_message": user_message,
-                "context": context
-            })
-            
-            # Clean and process response
-            response = response.strip()
+            response = self._complete(
+                system=[
+                    {
+                        "type": "text",
+                        "text": CONVERSATION_SYSTEM_PROMPT,
+                        # The persona never changes, so cache it and pay ~0.1x
+                        # for it on every later turn of the call.
+                        "cache_control": {"type": "ephemeral"},
+                    }
+                ],
+                user_content=(
+                    f"Context: {context}\nUser: {user_message}\n\n"
+                    "Respond in exactly 40 words or less:"
+                ),
+                # Well above the 40 spoken words - adaptive thinking draws from
+                # the same budget, and running out truncates the actual reply.
+                max_tokens=2048,
+            )
+
+            if not response:
+                return "I'm sorry, I couldn't process that request right now."
 
             # Add salesperson personality based on user input
             #response = self._add_salesperson_personality(response, user_message)
-            
+
             # Humanize the response
             #response = self._humanize_response(response)
-            
+
             # Enforce brevity as final step
             #response = self._enforce_brevity(response)
-            
+
             print(f"Raw response: {response}")
             logger.info("Response generated successfully")
-            
+
             return response
-            
-        except Exception as e:
-            logger.error(f"Groq LLM Error: {e}")
+
+        except anthropic.APIStatusError as e:
+            logger.error(f"Claude LLM Error ({e.status_code}): {e.message}")
             return "I'm sorry, I couldn't process that request right now."
-        
-        
+        except anthropic.APIConnectionError as e:
+            logger.error(f"Claude connection error: {e}")
+            return "I'm sorry, I couldn't process that request right now."
+        except Exception as e:
+            logger.error(f"Claude LLM Error: {e}")
+            return "I'm sorry, I couldn't process that request right now."
+
     def classify_intent_with_llm(self, user_message: str) -> Dict[str, Any]:
-        """Use LangChain and Groq for intent classification"""
+        """Use the Claude API for intent classification"""
         try:
             logger.info(f"Classifying intent for: {user_message[:50]}...")
-            
-            # Use the intent classification chain
-            intent_response = self.intent_chain.invoke({
-                "user_message": user_message
-            })
-            
+
+            intent_response = self._complete(
+                system=INTENT_SYSTEM_PROMPT,
+                user_content=f'User message: "{user_message}"',
+                max_tokens=1024,
+            )
+
             intent = intent_response.strip().lower()
-            
+
             # Validate intent
-            valid_intents = ["greet", "goodbye", "ask_question", "mood_great", 
+            valid_intents = ["greet", "goodbye", "ask_question", "mood_great",
                            "mood_unhappy", "bot_challenge", "other"]
-            
+
             if intent not in valid_intents:
                 intent = "other"
-            
+
             logger.info(f"Classified intent: {intent}")
-            
+
             return {
                 "intent": {"name": intent, "confidence": 0.8},
                 "entities": []
             }
-            
+
         except Exception as e:
-            logger.error(f"Groq Intent Classification Error: {e}")
+            logger.error(f"Claude Intent Classification Error: {e}")
             return {
                 "intent": {"name": "fallback", "confidence": 0.1},
                 "entities": []
             }
-        
+
 
     def _enforce_brevity(self, response: str) -> str:
         """Enforce brevity while maintaining natural flow"""
