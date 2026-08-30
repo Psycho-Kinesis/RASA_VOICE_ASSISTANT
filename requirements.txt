@@ -1,8 +1,25 @@
-flask==2.3.2
-twilio==8.5.0
+# NOTE: Rasa 3.6 supports Python 3.8-3.10 only (it does not run on 3.11+).
+# Create your virtualenv with Python 3.10.
+
+# Core framework - was missing from this file entirely
+rasa==3.6.21
+rasa-sdk>=3.6.2,<3.7.0
+
+# MCP server used by voice_interface.py.
+# Pinned to 1.x: mcp 2.0 renamed FastMCP -> MCPServer, which breaks
+# `from mcp.server.fastmcp import FastMCP`.
+mcp<2
+
+# LLM backend
+anthropic>=1.0.0
+
+# Voice / telephony
+# twilio is capped at <8.3 because rasa 3.6.21 requires twilio>=6.26,<8.3.
+twilio>=6.26,<8.3
 SpeechRecognition==3.10.0
 pyttsx3==2.90
 pygame==2.5.0
+
+flask==2.3.2
 requests==2.31.0
 python-dotenv==1.0.0
-anthropic>=1.0.0
