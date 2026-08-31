@@ -111,3 +111,67 @@
 - Driver-assist features are aids, not substitutes for driver responsibility.
 - BYD may change specifications without prior notice.
 - Bluetooth®, Apple CarPlay® and Android Auto™ are trademarks of their respective owners; availability may vary by market.
+---
+## OTHER BYD MODELS — DRAFT, UNVERIFIED (2026-01)
+
+The section above (Sealion 7) is detailed reference data. Everything below
+is a compact summary written from general knowledge, NOT verified against
+BYD's current official spec sheets or price lists. Treat every number here
+as approximate and subject to confirmation before quoting to a customer -
+market, trim and currency all shift these figures. Replace this section
+with real BYD spec sheets before using it for actual sales.
+
+### BYD Atto 3 (compact electric SUV)
+- Segment: Compact SUV, FWD, single motor
+- Motor Power: ~150 kW
+- 0-100 km/h: ~7.3 s
+- Battery: LFP "Blade Battery", ~49-60 kWh depending on trim
+- WLTP Range: ~340-420 km depending on battery size
+- Notable: distinctive interior styling (guitar-string door trim, gym-ring
+  door handles), rotatable central touchscreen
+
+### BYD Dolphin (compact electric hatchback)
+- Segment: Compact hatchback, FWD, single motor
+- Motor Power: ~70-150 kW depending on trim
+- Battery: LFP Blade Battery, ~44.9-60.5 kWh
+- WLTP Range: ~340-427 km depending on trim
+- Notable: entry-level BYD EV, positioned as an affordable city car
+
+### BYD Seal (electric sedan)
+- Segment: Mid-size sports sedan, RWD or AWD
+- Motor Power: RWD ~230 kW, AWD (Performance) ~390 kW combined
+- 0-100 km/h: RWD ~7.5 s, AWD Performance ~3.8 s
+- Battery: LFP Blade Battery, ~61.4-82.5 kWh
+- WLTP Range: ~460-570 km depending on trim
+- Notable: shares its platform (e-Platform 3.0) with the Sealion 7; direct
+  sedan counterpart in BYD's Ocean series
+
+### BYD Han (flagship electric sedan)
+- Segment: Full-size luxury sedan, RWD or AWD
+- Motor Power: AWD variants up to ~380 kW combined
+- 0-100 km/h: AWD ~3.9 s
+- Battery: LFP Blade Battery, ~85.4 kWh (EV variants)
+- WLTP Range: ~490-610 km depending on trim
+- Notable: BYD's flagship sedan, also offered as a plug-in hybrid (DM-p) in
+  some markets
+
+### BYD Tang (flagship electric/hybrid SUV)
+- Segment: Full-size 7-seat SUV, RWD, AWD or plug-in hybrid (DM-p)
+- Motor Power: AWD EV variants up to ~380 kW combined
+- 0-100 km/h: AWD EV ~4.4 s
+- Battery: LFP Blade Battery, ~86.4 kWh (EV variants)
+- WLTP Range: ~400-530 km depending on trim (EV); PHEV variants add a
+  combustion range extender
+- Notable: 7-seat flagship SUV, sold alongside a plug-in hybrid version in
+  many markets
+
+### BYD Song (compact/mid-size SUV, EV or PHEV)
+- Segment: Compact-to-mid-size SUV, sold as pure EV (Song Plus EV /
+  Song L) and as plug-in hybrid (Song Plus DM-i)
+- Motor Power: EV variants ~130-230 kW
+- Battery: LFP Blade Battery, EV ~71.8-82.5 kWh; PHEV uses a smaller
+  battery plus a combustion engine
+- WLTP Range: EV ~450-505 km; PHEV combined range much higher due to the
+  engine
+- Notable: one of BYD's highest-volume nameplates globally, especially the
+  PHEV variant

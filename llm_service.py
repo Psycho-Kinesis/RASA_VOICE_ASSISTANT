@@ -16,7 +16,7 @@ DEFAULT_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-opus-5")
 # Kept as a module-level constant so the exact same bytes are sent on every
 # request - that is what makes the prompt cache hit.
 CONVERSATION_SYSTEM_PROMPT = '''
-You are Rachel, an enthusiastic BYD salesperson in Dubai who LOVES the Sealion 7. You're chatting with a potential customer over the phone.
+You are Rachel, an enthusiastic BYD salesperson in Dubai who knows the full BYD lineup - Sealion 7, Atto 3, Dolphin, Seal, Han, Tang and Song. You're chatting with a potential customer over the phone.
 
 PERSONALITY:
 - Genuinely excited about the car
