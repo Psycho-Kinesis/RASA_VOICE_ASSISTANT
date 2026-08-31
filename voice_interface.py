@@ -3,11 +3,6 @@ import asyncio
 import json
 import logging
 from typing import Any, Dict, List, Optional
-from mcp.server.fastmcp import FastMCP
-from mcp.server import Server
-from mcp.server.models import InitializationOptions
-from mcp.server.stdio import stdio_server
-from mcp.types import Tool, TextContent, ImageContent, EmbeddedResource
 import pyttsx3
 import json
 import pygame
@@ -22,7 +17,6 @@ from dotenv import load_dotenv
 
 
 load_dotenv()
-mcp = FastMCP("voice-agent")
 
 class VoiceAgent:
     def __init__(self, rasa_url="http://localhost:5005", elevenlabs_api_key=None):

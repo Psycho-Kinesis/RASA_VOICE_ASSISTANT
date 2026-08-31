@@ -5,10 +5,10 @@
 rasa==3.6.21
 rasa-sdk>=3.6.2,<3.7.0
 
-# MCP server used by voice_interface.py.
-# Pinned to 1.x: mcp 2.0 renamed FastMCP -> MCPServer, which breaks
-# `from mcp.server.fastmcp import FastMCP`.
-mcp<2
+# NOTE: no `mcp` here. rasa 3.6 pins pydantic<1.10.10 while every release of
+# mcp needs pydantic>=2, so the two can never share an environment - listing
+# both made this file impossible to install. voice_interface.py imported mcp
+# but never used it, so the import was removed rather than the pin loosened.
 
 # LLM backend
 anthropic>=1.0.0
