@@ -31,8 +31,7 @@ RASA Voice Assistant
 
 ## 📋 Prerequisites
 
-- Python 3.8+
-- RASA 3.x
+- Python 3.8-3.10 (3.10 recommended). RASA 3.6 does not support Python 3.11+.
 - Microphone and speakers
 - Internet connection for speech recognition and TTS
 
@@ -49,8 +48,9 @@ RASA Voice Assistant
    ```
 
 2. **Create virtual environment**
+   Use Python 3.10 - RASA will not install on 3.11 or newer.
    ```bash
-   python -m venv rasa_env310
+   python3.10 -m venv rasa_env310
    source rasa_env310/bin/activate  # On Windows: rasa_env310\Scripts\activate
    ```
 
@@ -75,12 +75,23 @@ RASA Voice Assistant
 rasa train
 ```
 
-### 2. Start RASA Server
+### 2. Start the Action Server
+The custom actions in `actions/actions.py` are what call Claude, so this
+must be running or every LLM response falls back to an error message.
+Run it in its own terminal:
+```bash
+rasa run actions
+```
+It listens on port 5055, matching `action_endpoint` in `endpoints.yml`.
+
+### 3. Start RASA Server
+In a second terminal:
 ```bash
 rasa run --enable-api --cors "*" --debug
 ```
 
-### 3. Start Voice Interface
+### 4. Start Voice Interface
+In a third terminal:
 ```bash
 python voice_interface.py
 ```
@@ -106,6 +117,7 @@ RASA_Voice_Assistant/
 ├── voice_interface.py    # Voice interface implementation
 ├── llm_service.py        # LLM service integration
 ├── requirements.txt      # Python dependencies
+├── .env.example          # Template for your .env file
 └── README.md            # This file
 ```
 
