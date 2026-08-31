@@ -92,7 +92,39 @@ class LLMService:
         # cap the request rather than using the SDK's 10 minute default.
         self.client = anthropic.Anthropic(api_key=self.api_key, timeout=30.0)
 
-    def _complete(self, system: Any, user_content: str, max_tokens: int) -> str:
+    def _log_token_usage(self, response: Any, expect_cache: bool) -> None:
+        """Log per-request token usage, including whether the cache engaged.
+
+        A cached prefix shorter than the model's minimum (512 tokens on
+        claude-opus-5) is simply not cached - there is no error and no warning
+        from the API, just a bill that never goes down. The persona prompt is
+        close enough to that floor that the only way to know is to look.
+        """
+        usage = getattr(response, "usage", None)
+        if usage is None:
+            return
+
+        def field(name: str) -> int:
+            return getattr(usage, name, None) or 0
+
+        written = field("cache_creation_input_tokens")
+        read = field("cache_read_input_tokens")
+        logger.info(
+            "tokens: uncached=%d cache_write=%d cache_read=%d output=%d",
+            field("input_tokens"), written, read, field("output_tokens"),
+        )
+
+        # Only meaningful where we actually asked for caching - the intent
+        # classifier sends a plain system string with no cache_control.
+        if expect_cache and not written and not read:
+            logger.warning(
+                "Prompt cache did not engage: the cached prefix is below the "
+                "minimum for %s, so it is being re-billed in full every turn.",
+                self.model_name,
+            )
+
+    def _complete(self, system: Any, user_content: str, max_tokens: int,
+                  expect_cache: bool = False) -> str:
         """Send one request to Claude and return the plain text of the reply"""
         response = self.client.messages.create(
             model=self.model_name,
@@ -103,6 +135,8 @@ class LLMService:
             system=system,
             messages=[{"role": "user", "content": user_content}],
         )
+
+        self._log_token_usage(response, expect_cache)
 
         if response.stop_reason == "refusal":
             logger.warning("Claude declined to answer this turn")
@@ -140,6 +174,7 @@ class LLMService:
                 # Well above the 40 spoken words - adaptive thinking draws from
                 # the same budget, and running out truncates the actual reply.
                 max_tokens=2048,
+                expect_cache=True,
             )
 
             if not response:
