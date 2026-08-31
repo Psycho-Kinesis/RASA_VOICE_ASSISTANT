@@ -109,7 +109,7 @@ RASA_Voice_Assistant/
 │   ├── nlu.yml            # Intent and entity training
 │   ├── stories.yml        # Conversation flows
 │   └── rules.yml          # Business rules
-├── models/                 # Trained RASA models
+├── models/                 # Trained RASA models (produced by `rasa train`, not committed)
 ├── config.yml             # RASA configuration
 ├── domain.yml             # Domain definition
 ├── credentials.yml        # API credentials
