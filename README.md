@@ -31,71 +31,134 @@ RASA Voice Assistant
 
 ## 📋 Prerequisites
 
-- Python 3.8-3.10 (3.10 recommended). RASA 3.6 does not support Python 3.11+.
-- Microphone and speakers
-- Internet connection for speech recognition and TTS
+- **Python 3.10.** RASA 3.6 supports 3.8-3.10 only; on 3.11+ `pip install`
+  fails outright. You do **not** have to downgrade your system Python -
+  install 3.10 alongside it and point only this project's virtualenv at it
+  (see below).
+- About 3 GB of free disk. The virtualenv is ~2.7 GB, most of it TensorFlow.
+- Microphone and speakers (for `voice_interface.py` only - the REST API works
+  without them).
+- Internet connection for speech recognition and TTS.
 
-### API Keys Required
-- **ElevenLabs API Key**: For high-quality text-to-speech
-- **Anthropic API Key**: For LLM-powered responses (get one at https://console.anthropic.com)
+### API keys required
+- **Anthropic API key** - the LLM responses. https://console.anthropic.com
+- **ElevenLabs API key** - text-to-speech.
 
 ## 🛠️ Installation
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd RASA_Voice_Assistant
-   ```
+### 1. Get Python 3.10 alongside your current Python
 
-2. **Create virtual environment**
-   Use Python 3.10 - RASA will not install on 3.11 or newer.
-   ```bash
-   python3.10 -m venv rasa_env310
-   source rasa_env310/bin/activate  # On Windows: rasa_env310\Scripts\activate
-   ```
+Installing 3.10 does not remove or downgrade any other version; the
+virtualenv below pins this project to it and your system default is
+untouched.
 
-3. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
+| Platform | Command |
+|---|---|
+| Windows | `winget install Python.Python.3.10` (or the python.org installer) |
+| macOS | `brew install python@3.10` |
+| Ubuntu/Debian | `sudo add-apt-repository ppa:deadsnakes/ppa && sudo apt install python3.10 python3.10-venv` |
+| Any (pyenv) | `pyenv install 3.10.20 && pyenv local 3.10.20` |
+| Any (conda) | `conda create -n rasa python=3.10 && conda activate rasa` (then skip step 2) |
 
-4. **Set up environment variables**
-   Create a `.env` file in the project root:
-   ```env
-   ELEVEN_LABS_API2=your_elevenlabs_api_key_here
-   ANTHROPIC_API_KEY=your_anthropic_api_key_here
-   # Optional - defaults to claude-opus-5
-   # ANTHROPIC_MODEL=claude-opus-5
-   ```
+### 2. Create the virtualenv with that interpreter
+
+```bash
+python3.10 -m venv rasa_env310            # Windows: py -3.10 -m venv rasa_env310
+source rasa_env310/bin/activate           # Windows: rasa_env310\Scripts\activate
+python -V                                 # MUST print 3.10.x
+```
+
+If `python -V` reports anything else, the venv was built from the wrong
+interpreter - delete `rasa_env310/` and redo it with the explicit
+`python3.10` / `py -3.10` form. This is the most common setup failure.
+
+### 3. Install dependencies
+
+```bash
+pip install -r requirements.txt
+pip check                                 # expect: No broken requirements found
+```
+
+Takes several minutes (TensorFlow alone is a 586 MB download).
+
+> Do not add `mcp` to `requirements.txt`. RASA 3.6 pins `pydantic<1.10.10`
+> and every `mcp` release needs `pydantic>=2`, so the two cannot coexist -
+> adding it makes the file unsatisfiable. An MCP server would need its own
+> process and its own virtualenv.
+
+### 4. Set up environment variables
+
+```bash
+cp .env.example .env
+```
+
+Then fill in both keys. Note the ElevenLabs variable name - the code reads
+`ELEVEN_LABS_API2`, not `ELEVENLABS_API_KEY`:
+
+```env
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+ELEVEN_LABS_API2=your_elevenlabs_api_key_here
+# Optional - defaults to claude-opus-5
+# ANTHROPIC_MODEL=claude-opus-5
+```
 
 ## 🚀 Quick Start
 
-### 1. Train the RASA Model
+Activate the virtualenv in every terminal you open (`source
+rasa_env310/bin/activate`).
+
+### 1. Train the RASA model
 ```bash
 rasa train
 ```
+Takes roughly 2 minutes and ends with `Your Rasa model is trained and saved
+at 'models/<timestamp>-<name>.tar.gz'`. Required on a fresh clone - no
+trained model ships in the repo, and `models/*.tar.gz` is gitignored.
 
-### 2. Start the Action Server
+### 2. Start the action server (terminal 1, start this first)
 The custom actions in `actions/actions.py` are what call Claude, so this
 must be running or every LLM response falls back to an error message.
-Run it in its own terminal:
 ```bash
 rasa run actions
 ```
-It listens on port 5055, matching `action_endpoint` in `endpoints.yml`.
+Wait for `Action endpoint is up and running on http://0.0.0.0:5055`, which
+matches `action_endpoint` in `endpoints.yml`.
 
-### 3. Start RASA Server
-In a second terminal:
+### 3. Start the RASA server (terminal 2)
 ```bash
-rasa run --enable-api --cors "*" --debug
+rasa run --enable-api --cors "*"
+```
+This sits on `Loading model models/...` for about **75 seconds** while
+TensorFlow loads. That is normal, not a hang.
+
+### 4. Check it by text before involving the microphone
+
+This isolates the RASA + Claude path from all the audio variables:
+
+```bash
+curl -s -X POST http://localhost:5005/webhooks/rest/webhook \
+  -H "Content-Type: application/json" \
+  -d '{"sender":"me","message":"tell me about the performance of this car"}'
 ```
 
-### 4. Start Voice Interface
-In a third terminal:
+You should get a JSON reply. Terminal 1 will log the token usage:
+
+```
+tokens: uncached=66  cache_write=2253  cache_read=0  output=20
+```
+
+Ask a second question and it should read `cache_write=0 cache_read=2253` -
+the knowledge base is cached after the first call. If a later turn logs
+another `cache_write`, or you see `Prompt cache did not engage`, something
+is varying the cached prompt prefix and the knowledge base is being
+re-billed every turn.
+
+### 5. Start the voice interface (terminal 3)
 ```bash
 python voice_interface.py
 ```
-
+It calibrates the microphone for ambient noise, speaks its greeting, then
+listens. Say "goodbye" to exit.
 
 ## 📁 Project Structure
 
@@ -174,6 +237,30 @@ python voice_interface.py
 ```
 
 ## 🔍 Troubleshooting
+
+### Setup failures (in order of likelihood)
+
+**`pip install` fails with `ResolutionImpossible`.** Either the virtualenv was
+built with Python 3.11+, or `mcp` was added back to `requirements.txt`. Check
+`python -V` inside the activated venv first - it must say 3.10.x.
+
+**Every reply is "I'm sorry, I couldn't process that request right now."**
+The action server (terminal 1) is not running or has crashed. This fails
+*silently*: RASA returns the fallback string rather than an error, so nothing
+looks broken from the client side. Check terminal 1.
+
+**The RASA server looks frozen on `Loading model ...`.** Give it ~75 seconds.
+It is loading TensorFlow, not hung.
+
+**Replies work but nothing is spoken, and the log says "ElevenLabs API key not
+provided!".** The key is missing or under the wrong name in `.env`. The code
+reads `ELEVEN_LABS_API2`.
+
+**`Prompt cache did not engage`, or every turn logs `cache_write` instead of
+`cache_read`.** Something is varying the cached prompt prefix between turns,
+so the knowledge base is re-sent at full price on every turn. The prefix
+(persona + knowledge base) is built once in `LLMService.__init__` and must be
+byte-identical across requests.
 
 ### Common Issues
 
