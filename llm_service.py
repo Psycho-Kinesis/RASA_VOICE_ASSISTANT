@@ -221,6 +221,9 @@ class LLMService:
             
             return truncated
         
+        # Already short enough - hand the response back unchanged.
+        return response
+
     def _assess_user_interest(self, user_message: str) -> str:
         """Assess user's interest level from their message"""
         user_lower = user_message.lower()
