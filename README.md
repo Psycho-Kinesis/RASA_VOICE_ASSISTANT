@@ -154,6 +154,22 @@ is varying the cached prompt prefix and the knowledge base is being
 re-billed every turn.
 
 ### 5. Start the voice interface (terminal 3)
+
+This step - and only this step - needs **PyAudio**, which
+`speech_recognition` uses to open the microphone. It is deliberately not in
+`requirements.txt`: on Linux and macOS it builds from source against
+portaudio, so listing it would break `pip install -r requirements.txt` for
+anyone not doing voice.
+
+| Platform | Command |
+|---|---|
+| Windows | `pip install pyaudio` (prebuilt wheels, nothing else needed) |
+| macOS | `brew install portaudio && pip install pyaudio` |
+| Ubuntu/Debian | `sudo apt install portaudio19-dev && pip install pyaudio` |
+
+Without it you get `AttributeError: Could not find PyAudio; check
+installation` the moment `VoiceAgent` is constructed.
+
 ```bash
 python voice_interface.py
 ```
