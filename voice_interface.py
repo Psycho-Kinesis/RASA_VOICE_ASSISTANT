@@ -208,11 +208,6 @@ class VoiceAgent:
             bot_response = self.send_to_rasa(user_input)
             self.speak_text(bot_response)
 
-ELEVENLABS_API_KEY = os.getenv("ELEVEN_LABS_API2")
-agent = VoiceAgent(elevenlabs_api_key=ELEVENLABS_API_KEY)
-
-
-
 
 if __name__ == "__main__":
     # Start voice agent
