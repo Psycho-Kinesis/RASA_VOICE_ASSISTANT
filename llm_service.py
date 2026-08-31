@@ -78,10 +78,28 @@ Respond with just the intent name (lowercase), nothing else."""
 
 
 class LLMService:
-    def __init__(self, model_name: str = DEFAULT_MODEL, api_key: str = None):
-        """Initialize the LLM service backed by the Claude (Anthropic) API"""
+    def __init__(self, model_name: str = DEFAULT_MODEL, api_key: str = None,
+                 knowledge_base: str = ""):
+        """Initialize the LLM service backed by the Claude (Anthropic) API
+
+        `knowledge_base` is taken once, at construction, rather than per call:
+        it is what makes the cached prefix byte-identical between turns, and a
+        value that could change per request would quietly stop caching.
+        """
 
         self.model_name = model_name
+        self.knowledge_base = knowledge_base
+
+        # Persona first, then the (much larger) knowledge base, with the single
+        # cache breakpoint on the last stable block so the whole prefix is
+        # cached. Together they clear the 512-token minimum comfortably; the
+        # persona alone sits right on it.
+        self._system_blocks = [{"type": "text", "text": CONVERSATION_SYSTEM_PROMPT}]
+        if knowledge_base:
+            self._system_blocks.append(
+                {"type": "text", "text": f"Product knowledge base:\n{knowledge_base}"}
+            )
+        self._system_blocks[-1]["cache_control"] = {"type": "ephemeral"}
 
         # Get API key from parameter or environment variable
         self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
@@ -158,15 +176,10 @@ class LLMService:
             self.user_interest_level = current_interest
 
             response = self._complete(
-                system=[
-                    {
-                        "type": "text",
-                        "text": CONVERSATION_SYSTEM_PROMPT,
-                        # The persona never changes, so cache it and pay ~0.1x
-                        # for it on every later turn of the call.
-                        "cache_control": {"type": "ephemeral"},
-                    }
-                ],
+                # Persona + knowledge base never change, so they are cached and
+                # cost ~0.1x on every later turn of the call. Only the
+                # conversation history and this turn's question are re-sent.
+                system=self._system_blocks,
                 user_content=(
                     f"Context: {context}\nUser: {user_message}\n\n"
                     "Respond in exactly 40 words or less:"

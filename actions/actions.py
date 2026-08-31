@@ -21,8 +21,10 @@ class ActionProcessWithLLM(Action):
         return "action_process_with_llm"
 
     def __init__(self):
-        self.llm_service = LLMService()
         self.knowledge_base = self._load_knowledge_base()
+        # Handed over once so it lands in the cached prompt prefix instead of
+        # being re-sent (and re-billed) inside every turn's context string.
+        self.llm_service = LLMService(knowledge_base=self.knowledge_base)
 
     def _load_knowledge_base(self) -> str:
         """Load knowledge base from txt file"""
@@ -57,10 +59,9 @@ class ActionProcessWithLLM(Action):
         
         conversation_context = "\n".join(conversation_history[-12:])  # Last 6 exchanges
         
-        # Combine knowledge base with conversation context
+        # Knowledge base now travels in the cached system prompt, so only the
+        # volatile conversation history goes in the per-turn context.
         full_context = ""
-        if self.knowledge_base:
-            full_context += f"Knowledge Base:\n{self.knowledge_base}\n\n"
         if conversation_context:
             full_context += f"Conversation History:\n{conversation_context}"
         
@@ -78,8 +79,10 @@ class ActionFallbackLLM(Action):
         return "action_fallback_llm"
 
     def __init__(self):
-        self.llm_service = LLMService()
         self.knowledge_base = self._load_knowledge_base()
+        # Handed over once so it lands in the cached prompt prefix instead of
+        # being re-sent (and re-billed) inside every turn's context string.
+        self.llm_service = LLMService(knowledge_base=self.knowledge_base)
 
     def _load_knowledge_base(self) -> str:
         """Load knowledge base from txt file"""
@@ -104,12 +107,8 @@ class ActionFallbackLLM(Action):
         
         user_message = tracker.latest_message.get('text')
         start = time.time()
-        # Combine knowledge base with fallback context
-        fallback_context = "The user said something I didn't understand. Please help them."
-        full_context = ""
-        if self.knowledge_base:
-            full_context += f"Knowledge Base:\n{self.knowledge_base}\n\n"
-        full_context += fallback_context
+        # Knowledge base travels in the cached system prompt (see __init__).
+        full_context = "The user said something I didn't understand. Please help them."
         
         # Use LLM for fallback responses
         print("[LLM] Starting response generation...")
